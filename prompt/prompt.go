@@ -13,9 +13,8 @@ func Generate() {
 	entry := changelog.NewEntry()
 	prompter := input.NewHandler()
 
-	fmt.Println("--- Interactive Changelog Generator ---")
-	fmt.Println("Please answer the following questions to generate the changelog.")
-	fmt.Println()
+	fmt.Printf("\033[36m\033[1m--- Interactive Changelog Generator ---\033[0m\n")
+	fmt.Printf("\033[2mPlease answer the following questions to generate the changelog.\033[0m\n\n")
 
 	selectedTypes := promptChangeTypes(prompter)
 	promptBasicInfo(&entry, prompter)
@@ -26,7 +25,7 @@ func Generate() {
 	promptTesting(&entry, prompter)
 	promptChecklist(&entry, prompter)
 
-	fmt.Println("\nCollecting git commit information...")
+	fmt.Printf("\n\033[33m\033[1m⏳ Collecting git commit information...\033[0m\n")
 
 	// Use current working directory for file generation
 	cwd, err := os.Getwd()
@@ -41,7 +40,7 @@ func Generate() {
 		return
 	}
 
-	fmt.Printf("\n✅ Success! Changelog generated at: %s/%s\n", filePath, entry.Filename)
+	fmt.Printf("\n\033[32m\033[1m✅ Success! Changelog generated at: %s/%s\033[0m\n", filePath, entry.Filename)
 }
 
 func promptChangeTypes(prompter input.Prompter) map[string]string {
@@ -83,7 +82,7 @@ func promptTesting(entry *changelog.Entry, prompter input.Prompter) {
 }
 
 func promptChecklist(entry *changelog.Entry, prompter input.Prompter) {
-	fmt.Println("Please complete the final checklist:")
+	fmt.Printf("\033[35m? \033[1mPlease complete the final checklist:\033[0m\n")
 	entry.Checklist.SelfReview, _ = prompter.TakeBooleanTypeInput("I have performed a self-review of my code", true)
 	entry.Checklist.IncludesTesting, _ = prompter.TakeBooleanTypeInput("I have added tests that prove my fix is effective or my feature works", false)
 	entry.Checklist.Documentation, _ = prompter.TakeBooleanTypeInput("I have added necessary documentation (if appropriate)", false)

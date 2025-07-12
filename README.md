@@ -4,10 +4,12 @@ An interactive command-line tool for generating structured changelog entries in 
 
 ## Features
 
-- Interactive prompts for changelog creation
+- Interactive prompts with colorful UI
+- Intuitive navigation (arrow keys, vim-style keys)
 - Git integration (branch, commits, user info)
 - Markdown output with structured sections
-- Customizable change types
+- Customizable change types with validation
+- Inline yes/no selection
 - Checklist for PR readiness
 - Works from any directory
 
@@ -33,6 +35,22 @@ go build -o changelog-go
 changelog-go
 ```
 
+### Navigation Controls
+
+**Multi-select options:**
+- ↑/↓ or j/k: Navigate up/down
+- SPACE: Toggle selection
+- a: Toggle all options
+- ENTER: Confirm selection
+
+**Yes/No questions:**
+- ←/→ or h/l: Navigate left/right
+- ENTER: Confirm selection
+
+**Text input:**
+- Type normally for single-line input
+- For multi-line input, type "EOF" on a new line to finish
+
 ### As a Go package
 
 ```go
@@ -55,6 +73,15 @@ The tool creates a structured changelog in `.logs/.changelog/` with sections for
 - Testing instructions
 - PR checklist
 - Git commit history
+
+## UI Features
+
+- **Colorful interface** with syntax highlighting
+- **Multi-select options** with ✓ checkmarks
+- **Inline yes/no selection** using ←/→ arrows or h/l keys
+- **Question prefixes** with ? symbols for clarity
+- **Validation** requiring at least one change type
+- **Visual feedback** with error messages and success indicators
 
 ## Example Output
 
@@ -93,11 +120,18 @@ go test ./... -cover
 ### Project Structure
 
 ```
+├── .logs/         # Generated changelog output
 ├── changelog/     # Core changelog logic
 ├── command/       # Git command execution
-├── input/         # User input handling
-├── prompt/        # Interactive prompts
-└── main.go        # CLI entry point
+├── input/         # User input handling with validation
+├── prompt/        # Interactive prompts with colors
+├── ui/            # User interface components
+│   ├── colors.go      # Color constants
+│   ├── boolean.go     # Inline yes/no selection
+│   ├── multiselect.go # Multi-option selection with validation
+│   └── terminal.go    # Terminal control
+├── main.go        # CLI entry point
+└── *_test.go      # Test files
 ```
 
 ## License

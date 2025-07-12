@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/abirhasanmubin/changelog-go/ui"
 )
 
 var (
-	InputTakingError = errors.New("Error while taking input")
+	TakingInputError = errors.New("error while taking input")
 )
 
 type Reader interface {
@@ -24,40 +26,53 @@ func (sr StdinReader) ReadLine() (string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return "", InputTakingError
+		return "", TakingInputError
 	}
 	return strings.TrimSpace(input), nil
 }
 
 func (sr StdinReader) ReadMultiInstruction(delimiter string) ([]string, error) {
-	scanner := bufio.NewScanner(os.Stdin)
+	reader := bufio.NewReader(os.Stdin)
 	var lines []string
 
-	fmt.Printf("(Enter %q on a new line to finish input)\n", delimiter)
+	fmt.Printf("\033[2m(Enter %q on a new line to finish input)\033[0m\n", delimiter)
 
 	for {
-		if !scanner.Scan() {
-			break
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, TakingInputError
 		}
-		line := scanner.Text()
+
+		line = strings.TrimRight(line, "\n\r")
 		if line == delimiter {
 			break
 		}
-		lines = append(lines, strings.TrimSpace(line))
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, InputTakingError
+		lines = append(lines, line)
 	}
 
 	return lines, nil
 }
 
 func (sr StdinReader) ReadMultiLine(delimiter string) (string, error) {
-	lines, err := sr.ReadMultiInstruction(delimiter)
-	if err != nil {
-		return "", err
+	reader := bufio.NewReader(os.Stdin)
+	var lines []string
+
+	fmt.Printf("\033[2m(Enter %q on a new line to finish input)\033[0m\n", delimiter)
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return "", TakingInputError
+		}
+
+		line = strings.TrimRight(line, "\n\r")
+		if line == delimiter {
+			break
+		}
+		lines = append(lines, line)
 	}
+
+	fmt.Println() // Add newline after multi-line input
 	return strings.Join(lines, "\n"), nil
 }
 
@@ -70,16 +85,21 @@ type Prompter interface {
 }
 
 type Handler struct {
-	reader Reader
+	reader   Reader
+	testMode bool
 }
 
 func NewHandler() Handler {
-	return Handler{reader: StdinReader{}}
+	return Handler{reader: StdinReader{}, testMode: false}
+}
+
+func NewTestHandler(reader Reader) Handler {
+	return Handler{reader: reader, testMode: true}
 }
 
 func (h Handler) TakeSingleLineInput(question string) (string, error) {
 	for {
-		fmt.Printf("%s: ", question)
+		fmt.Printf("\033[34m? \033[1m%s:\033[0m ", question)
 		input, err := h.reader.ReadLine()
 		if err != nil {
 			return "", err
@@ -89,108 +109,136 @@ func (h Handler) TakeSingleLineInput(question string) (string, error) {
 			return input, nil
 		}
 
-		fmt.Println("Input cannot be empty. Please try again.")
+		fmt.Printf("\033[31m⚠ Input cannot be empty. Please try again.\033[0m\n")
 	}
 }
 
 func (h Handler) TakeMultiLineInput(question string) (string, error) {
-	fmt.Printf("%s: ", question)
+	fmt.Printf("\033[34m? \033[1m%s:\033[0m ", question)
 	input, error := h.reader.ReadMultiLine("EOF")
 	return input, error
 }
 
 func (h Handler) TakeMultiInstructionInput(question string) ([]string, error) {
-	fmt.Printf("%s: ", question)
+	fmt.Printf("\033[34m? \033[1m%s:\033[0m ", question)
 	input, error := h.reader.ReadMultiInstruction("EOF")
 	return input, error
 }
 
 func (h Handler) TakeBooleanTypeInput(question string, defaultValue bool) (bool, error) {
-	prompt := "(yes/no)"
-	if defaultValue {
-		prompt = "(Yes/no)"
-	} else {
-		prompt = "(yes/No)"
+	if h.testMode {
+		// Fallback to old behavior for testing
+		prompt := "(yes/no)"
+		if defaultValue {
+			prompt = "(Yes/no)"
+		} else {
+			prompt = "(yes/No)"
+		}
+
+		for {
+			fmt.Printf("%s %s: ", question, prompt)
+			input, err := h.reader.ReadLine()
+			if err != nil {
+				return false, err
+			}
+
+			input = strings.ToLower(strings.TrimSpace(input))
+			if input == "" {
+				return defaultValue, nil
+			}
+
+			switch input {
+			case "y", "yes", "true", "1":
+				return true, nil
+			case "n", "no", "false", "0":
+				return false, nil
+			default:
+				fmt.Println("Please enter y/yes/true/1 or n/no/false/0")
+			}
+		}
 	}
 
-	for {
-		fmt.Printf("%s %s: ", question, prompt)
-		input, err := h.reader.ReadLine()
-		if err != nil {
-			return false, err
-		}
-
-		input = strings.ToLower(strings.TrimSpace(input))
-		if input == "" {
-			return defaultValue, nil
-		}
-
-		switch input {
-		case "y", "yes", "true", "1":
-			return true, nil
-		case "n", "no", "false", "0":
-			return false, nil
-		default:
-			fmt.Println("Please enter y/yes/true/1 or n/no/false/0")
-		}
-	}
+	boolSelect := ui.NewBooleanSelect(question, defaultValue)
+	return boolSelect.Run()
 }
 
 func (h Handler) TakeMultiSelectInput(question string, options []string) (map[string]string, error) {
-	for {
-		fmt.Printf("%s:\n", question)
-		for i, option := range options {
-			fmt.Printf("%d. %s\n", i+1, option)
-		}
-		fmt.Print("Select options (comma-separated numbers): ")
-		
-		input, err := h.reader.ReadLine()
-		if err != nil {
-			return nil, err
-		}
-		
-		result := make(map[string]string)
-		for _, option := range options {
-			result[option] = ""
-		}
-		
-		if strings.TrimSpace(input) == "" {
-			fmt.Println("Please select at least one option.")
-			continue
-		}
-		
-		hasSelection := false
-		selections := strings.Split(input, ",")
-		for _, sel := range selections {
-			sel = strings.TrimSpace(sel)
-			if sel == "" {
+	if h.testMode {
+		// Fallback to old behavior for testing
+		for {
+			fmt.Printf("%s:\n", question)
+			for i, option := range options {
+				fmt.Printf("%d. %s\n", i+1, option)
+			}
+			fmt.Print("Select options (comma-separated numbers): ")
+
+			input, err := h.reader.ReadLine()
+			if err != nil {
+				return nil, err
+			}
+
+			result := make(map[string]string)
+			for _, option := range options {
+				result[option] = ""
+			}
+
+			if strings.TrimSpace(input) == "" {
+				fmt.Println("Please select at least one option.")
 				continue
 			}
-			
-			var idx int
-			if _, err := fmt.Sscanf(sel, "%d", &idx); err != nil {
-				continue
-			}
-			
-			if idx >= 1 && idx <= len(options) {
-				option := options[idx-1]
-				hasSelection = true
-				if strings.ToLower(option) == "other" {
-					customInput, err := h.TakeSingleLineInput("Please specify")
-					if err != nil {
-						return nil, err
+
+			hasSelection := false
+			selections := strings.Split(input, ",")
+			for _, sel := range selections {
+				sel = strings.TrimSpace(sel)
+				if sel == "" {
+					continue
+				}
+
+				var idx int
+				if _, err := fmt.Sscanf(sel, "%d", &idx); err != nil {
+					continue
+				}
+
+				if idx >= 1 && idx <= len(options) {
+					option := options[idx-1]
+					hasSelection = true
+					if strings.ToLower(option) == "other" {
+						customInput, err := h.TakeSingleLineInput("Please specify")
+						if err != nil {
+							return nil, err
+						}
+						result[option] = customInput
+					} else {
+						result[option] = option
 					}
-					result[option] = customInput
-				} else {
-					result[option] = option
 				}
 			}
+
+			if hasSelection {
+				return result, nil
+			}
+
+			fmt.Println("Please select at least one valid option.")
 		}
-		
-		if hasSelection {
-			return result, nil
-		}
-		
-		fmt.Println("Please select at least one valid option.")
 	}
+
+	multiSelect := ui.NewMultiSelect(options)
+	result, err := multiSelect.Run(question)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle "Other" option with custom input
+	for option, value := range result {
+		if value != "" && strings.ToLower(option) == "other" {
+			customInput, err := h.TakeSingleLineInput("Please specify")
+			if err != nil {
+				return nil, err
+			}
+			result[option] = customInput
+		}
+	}
+
+	return result, nil
 }

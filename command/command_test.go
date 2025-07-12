@@ -40,8 +40,8 @@ func TestCommandRunner_Run(t *testing.T) {
 	t.Run("Returns error for invalid git subcommand", func(t *testing.T) {
 		cmd := CommandRunner{}
 		_, err := cmd.Run(GIT, "not-a-real-subcommand")
-		if err == nil || !errors.Is(err, CommandRunningError) {
-			t.Errorf("expected CommandRunningError, got %v", err)
+		if err == nil || !errors.Is(err, RunningCommandError) {
+			t.Errorf("expected RunningCommandError, got %v", err)
 		}
 	})
 
@@ -91,7 +91,7 @@ func TestCommands_GetUsername(t *testing.T) {
 	})
 
 	t.Run("Returns NoUsernameFoundError when both git and local fail", func(t *testing.T) {
-		mock := MockRunner{Output: "", Err: CommandRunningError}
+		mock := MockRunner{Output: "", Err: RunningCommandError}
 		cmd := Commands{Cmd: mock}
 
 		_, err := cmd.GetUsername()
@@ -154,13 +154,13 @@ func TestCommands_GetCurrentBranch(t *testing.T) {
 	t.Run("Returns error when branch --show-current fails", func(t *testing.T) {
 		mock := &MockRunnerWithCallCount{
 			Outputs: []string{"", ""},
-			Errs:    []error{nil, CommandRunningError},
+			Errs:    []error{nil, RunningCommandError},
 		}
 		cmd := Commands{Cmd: mock}
 
 		_, err := cmd.GetCurrentBranch()
-		if !errors.Is(err, CommandRunningError) {
-			t.Errorf("expected CommandRunningError, got %v", err)
+		if !errors.Is(err, RunningCommandError) {
+			t.Errorf("expected RunningCommandError, got %v", err)
 		}
 	})
 }
@@ -214,13 +214,13 @@ func TestCommands_GetCommitsOfCurrentBranch(t *testing.T) {
 	t.Run("Returns error when git log fails", func(t *testing.T) {
 		mock := &MockRunnerWithCallCount{
 			Outputs: []string{"", "main", ""},
-			Errs:    []error{nil, nil, CommandRunningError},
+			Errs:    []error{nil, nil, RunningCommandError},
 		}
 		cmd := Commands{Cmd: mock}
 
 		_, err := cmd.GetCommitsOfCurrentBranch()
-		if !errors.Is(err, CommandRunningError) {
-			t.Errorf("expected CommandRunningError, got %v", err)
+		if !errors.Is(err, RunningCommandError) {
+			t.Errorf("expected RunningCommandError, got %v", err)
 		}
 	})
 
@@ -263,12 +263,12 @@ func TestCommands_GetCommitHttpUrlPrefixFromRemoteUrl_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Returns error when git config fails", func(t *testing.T) {
-		mock := MockRunner{Output: "", Err: CommandRunningError}
+		mock := MockRunner{Output: "", Err: RunningCommandError}
 		cmd := Commands{Cmd: mock}
 
 		_, err := cmd.GetCommitHttpUrlPrefixFromRemoteUrl()
-		if !errors.Is(err, CommandRunningError) {
-			t.Errorf("expected CommandRunningError, got %v", err)
+		if !errors.Is(err, RunningCommandError) {
+			t.Errorf("expected RunningCommandError, got %v", err)
 		}
 	})
 }
@@ -326,7 +326,7 @@ func TestCommands_GetUsername_FallbackToLocal(t *testing.T) {
 	t.Run("Returns local username when git fails", func(t *testing.T) {
 		mock := &MockRunnerWithCallCount{
 			Outputs: []string{"", "localuser"},
-			Errs:    []error{CommandRunningError, nil},
+			Errs:    []error{RunningCommandError, nil},
 		}
 		cmd := Commands{Cmd: mock}
 
