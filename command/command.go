@@ -161,7 +161,8 @@ func (c Commands) GetCommitsOfCurrentBranch() (string, error) {
 		return "", err
 	}
 
-	commits, err := c.Cmd.Run(GIT, "log", branch, "--oneline", "--no-merges")
+	targetToSourceBranch := "master.." + branch
+	commits, err := c.Cmd.Run(GIT, "log", targetToSourceBranch, "--oneline", "--no-merges")
 	if err != nil {
 		return "", err
 	}
