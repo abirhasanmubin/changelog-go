@@ -13,7 +13,7 @@ import (
 // Predefined errors
 var (
 	NoArgumentError            = errors.New("no argument passed in the command")
-	CommandRunningError        = errors.New("error running supplied command")
+	RunningCommandError        = errors.New("error running supplied command")
 	NoUsernameFoundError       = errors.New("no username found")
 	NoGitBranchFoundError      = errors.New("no git branch found, please checkout to a branch")
 	NoCommitHttpUrlPrefixError = errors.New("no http url prefix found for current repo")
@@ -68,7 +68,7 @@ func (CommandRunner) Run(ct CommandType, args ...string) (string, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%w: %s", CommandRunningError, stderr.String())
+		return "", fmt.Errorf("%w: %s", RunningCommandError, stderr.String())
 	}
 	return strings.TrimSpace(stdout.String()), nil
 }

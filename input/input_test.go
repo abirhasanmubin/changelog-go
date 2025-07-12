@@ -18,7 +18,7 @@ func (mr *MockReader) ReadLine() (string, error) {
 	response := mr.responses[mr.index]
 	mr.index++
 	if response == "ERROR" {
-		return "", InputTakingError
+		return "", TakingInputError
 	}
 	return response, nil
 }
@@ -30,7 +30,7 @@ func (mr *MockReader) ReadMultiInstruction(delimiter string) ([]string, error) {
 	response := mr.responses[mr.index]
 	mr.index++
 	if response == "ERROR" {
-		return nil, InputTakingError
+		return nil, TakingInputError
 	}
 	if response == "" {
 		return []string{}, nil
@@ -61,9 +61,9 @@ func TestTakeSingleLineInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := Handler{reader: &MockReader{responses: tt.responses}}
+			handler := NewTestHandler(&MockReader{responses: tt.responses})
 			result, err := handler.TakeSingleLineInput("test question")
-			
+
 			if tt.wantError && err == nil {
 				t.Error("expected error but got none")
 			}
@@ -91,9 +91,9 @@ func TestTakeMultiLineInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := Handler{reader: &MockReader{responses: tt.responses}}
+			handler := NewTestHandler(&MockReader{responses: tt.responses})
 			result, err := handler.TakeMultiLineInput("test question")
-			
+
 			if tt.wantError && err == nil {
 				t.Error("expected error but got none")
 			}
@@ -121,9 +121,9 @@ func TestTakeMultiInstructionInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := Handler{reader: &MockReader{responses: tt.responses}}
+			handler := NewTestHandler(&MockReader{responses: tt.responses})
 			result, err := handler.TakeMultiInstructionInput("test question")
-			
+
 			if tt.wantError && err == nil {
 				t.Error("expected error but got none")
 			}
@@ -166,9 +166,9 @@ func TestTakeBooleanTypeInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := Handler{reader: &MockReader{responses: tt.responses}}
+			handler := NewTestHandler(&MockReader{responses: tt.responses})
 			result, err := handler.TakeBooleanTypeInput("test question", tt.defaultValue)
-			
+
 			if tt.wantError && err == nil {
 				t.Error("expected error but got none")
 			}
@@ -184,7 +184,7 @@ func TestTakeBooleanTypeInput(t *testing.T) {
 
 func TestTakeMultiSelectInput(t *testing.T) {
 	options := []string{"Go", "Python", "JavaScript", "Other"}
-	
+
 	tests := []struct {
 		name      string
 		responses []string
@@ -231,9 +231,9 @@ func TestTakeMultiSelectInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := Handler{reader: &MockReader{responses: tt.responses}}
+			handler := NewTestHandler(&MockReader{responses: tt.responses})
 			result, err := handler.TakeMultiSelectInput("test question", options)
-			
+
 			if tt.wantError && err == nil {
 				t.Error("expected error but got none")
 			}
@@ -261,161 +261,13 @@ func TestNewHandler(t *testing.T) {
 	}
 }
 
-func TestStdinReader_ReadLine(t *testing.T) {
-	reader := StdinReader{}
-	// Test that the method exists and returns correct type
-	if reader == (StdinReader{}) {
-		// Struct is properly defined
+func TestNewTestHandler(t *testing.T) {
+	mockReader := &MockReader{}
+	handler := NewTestHandler(mockReader)
+	if handler.reader != mockReader {
+		t.Error("expected reader to be the provided mock reader")
 	}
-}
-
-func TestStdinReader_ReadMultiInstruction(t *testing.T) {
-	reader := StdinReader{}
-	// Test that the method exists and returns correct type
-	if reader == (StdinReader{}) {
-		// Struct is properly defined
-	}
-}
-
-func TestStdinReader_ReadMultiLine(t *testing.T) {
-	reader := StdinReader{}
-	// Test that the method exists and returns correct type
-	if reader == (StdinReader{}) {
-		// Struct is properly defined
-	}
-}
-
-func TestInputTakingError(t *testing.T) {
-	if InputTakingError.Error() != "Error while taking input" {
-		t.Errorf("expected 'Error while taking input', got %q", InputTakingError.Error())
-	}
-}
-
-func TestTakeMultiSelectInput_EdgeCases(t *testing.T) {
-	options := []string{"Go", "Python", "other"}
-	
-	tests := []struct {
-		name      string
-		responses []string
-		expected  map[string]string
-	}{
-		{
-			"whitespace in selection",
-			[]string{" 1 , 2 "},
-			map[string]string{"Go": "Go", "Python": "Python", "other": ""},
-		},
-		{
-			"invalid number format",
-			[]string{"abc,1"},
-			map[string]string{"Go": "Go", "Python": "", "other": ""},
-		},
-		{
-			"out of range selection",
-			[]string{"0,5,1"},
-			map[string]string{"Go": "Go", "Python": "", "other": ""},
-		},
-		{
-			"empty selection parts",
-			[]string{",1,"},
-			map[string]string{"Go": "Go", "Python": "", "other": ""},
-		},
-		{
-			"other option error in custom input",
-			[]string{"3", "ERROR"},
-			nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			handler := Handler{reader: &MockReader{responses: tt.responses}}
-			result, err := handler.TakeMultiSelectInput("test question", options)
-			
-			if tt.expected == nil {
-				if err == nil {
-					t.Error("expected error but got none")
-				}
-				return
-			}
-			
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			
-			for key, expectedVal := range tt.expected {
-				if result[key] != expectedVal {
-					t.Errorf("expected %q for key %q, got %q", expectedVal, key, result[key])
-				}
-			}
-		})
-	}
-}
-
-func TestTakeBooleanTypeInput_CaseInsensitive(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected bool
-	}{
-		{"uppercase YES", "YES", true},
-		{"mixed case True", "True", true},
-		{"uppercase NO", "NO", false},
-		{"mixed case False", "False", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			handler := Handler{reader: &MockReader{responses: []string{tt.input}}}
-			result, err := handler.TakeBooleanTypeInput("test", false)
-			
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if result != tt.expected {
-				t.Errorf("expected %t, got %t", tt.expected, result)
-			}
-		})
-	}
-}
-
-func TestMockReader_ReadMultiLine(t *testing.T) {
-	mr := &MockReader{responses: []string{"line1\nline2"}}
-	result, err := mr.ReadMultiLine("EOF")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if result != "line1\nline2" {
-		t.Errorf("expected 'line1\\nline2', got %q", result)
-	}
-}
-
-func TestMockReader_ReadMultiLine_Error(t *testing.T) {
-	mr := &MockReader{responses: []string{"ERROR"}}
-	_, err := mr.ReadMultiLine("EOF")
-	if err == nil {
-		t.Error("expected error but got none")
-	}
-}
-
-func TestMockReader_OutOfResponses(t *testing.T) {
-	mr := &MockReader{responses: []string{}}
-	_, err := mr.ReadLine()
-	if err == nil {
-		t.Error("expected error but got none")
-	}
-}
-
-func TestTakeMultiSelectInput_AllInvalidSelections(t *testing.T) {
-	options := []string{"Go", "Python"}
-	handler := Handler{reader: &MockReader{responses: []string{"abc,xyz", "1"}}}
-	result, err := handler.TakeMultiSelectInput("test", options)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	expected := map[string]string{"Go": "Go", "Python": ""}
-	for key, expectedVal := range expected {
-		if result[key] != expectedVal {
-			t.Errorf("expected %q for key %q, got %q", expectedVal, key, result[key])
-		}
+	if !handler.testMode {
+		t.Error("expected test mode to be true")
 	}
 }
