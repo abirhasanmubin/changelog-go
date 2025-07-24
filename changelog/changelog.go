@@ -43,10 +43,11 @@ type GitCommit struct {
 }
 
 type Metadata struct {
-	Branch    string
-	UserName  string
-	CommitUrl string
-	Commits   []GitCommit
+	Branch       string
+	TargetBranch string
+	UserName     string
+	CommitUrl    string
+	Commits      []GitCommit
 }
 
 func (metadata Metadata) GenerateFilename() string {
@@ -84,7 +85,22 @@ func (e *Entry) PopulateMetadata() {
 	branch, _ := cmd.GetCurrentBranch()
 	username, _ := cmd.GetUsername()
 	commitUrl, _ := cmd.GetCommitHttpUrlPrefixFromRemoteUrl()
-	commitsStr, _ := cmd.GetCommitsOfCurrentBranch()
+
+	metadata := Metadata{
+		Branch:    branch,
+		UserName:  username,
+		CommitUrl: commitUrl,
+	}
+	filename := metadata.GenerateFilename()
+	e.Metadata = metadata
+	e.Filename = filename
+}
+
+func (e *Entry) PopulateCommitHistory(targetBranch string) {
+	cmd := command.Commands{Cmd: command.CommandRunner{}}
+	e.Metadata.TargetBranch = targetBranch
+
+	commitsStr, _ := cmd.GetCommitsBetweenBranches(targetBranch, e.Metadata.Branch)
 
 	var commits []GitCommit
 	if commitsStr != "" {
@@ -96,22 +112,13 @@ func (e *Entry) PopulateMetadata() {
 					commits = append(commits, GitCommit{
 						Hash:      parts[0],
 						Message:   parts[1],
-						CommitUrl: commitUrl + parts[0],
+						CommitUrl: e.Metadata.CommitUrl + parts[0],
 					})
 				}
 			}
 		}
 	}
-
-	metadata := Metadata{
-		Branch:    branch,
-		UserName:  username,
-		CommitUrl: commitUrl,
-		Commits:   commits,
-	}
-	filename := metadata.GenerateFilename()
-	e.Metadata = metadata
-	e.Filename = filename
+	e.Metadata.Commits = commits
 }
 
 func NewEntry() Entry {
@@ -149,7 +156,7 @@ func (e *Entry) GenerateMarkdown(selectedTypes map[string]string) string {
 	}
 
 	// Type of change
-	md.WriteString("## Type of change (Check all that apply)\n\n")
+	md.WriteString("## Type of change\n\n")
 	allTypes := []string{"Bug fix", "New feature", "Code refactor", "Breaking change", "Documentation update", "Other"}
 	for _, changeType := range allTypes {
 		if val, exists := selectedTypes[changeType]; exists && val != "" {
@@ -203,7 +210,11 @@ func (e *Entry) GenerateMarkdown(selectedTypes map[string]string) string {
 	// Commit List
 	if len(e.Metadata.Commits) > 0 {
 		md.WriteString("## Commit List\n\n")
-		md.WriteString(fmt.Sprintf("Commits from branch '%s':\n", e.Metadata.Branch))
+		if e.Metadata.TargetBranch != "" {
+			md.WriteString(fmt.Sprintf("Commits from '%s' to '%s':\n", e.Metadata.TargetBranch, e.Metadata.Branch))
+		} else {
+			md.WriteString(fmt.Sprintf("Commits from branch '%s':\n", e.Metadata.Branch))
+		}
 		for _, commit := range e.Metadata.Commits {
 			md.WriteString(fmt.Sprintf("- [%s](%s) %s\n", commit.Hash[:7], commit.CommitUrl, commit.Message))
 		}

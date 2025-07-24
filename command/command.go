@@ -78,6 +78,8 @@ type CommandLists interface {
 	GetOSUserName() (string, error)
 	GetCurrentBranch() (string, error)
 	GetCommitHttpUrlPrefixFromRemoteUrl() (string, error)
+	GetBranches() ([]string, error)
+	GetCommitsBetweenBranches(targetBranch, currentBranch string) (string, error)
 }
 
 type Commands struct {
@@ -162,6 +164,40 @@ func (c Commands) GetCommitsOfCurrentBranch() (string, error) {
 	}
 
 	commits, err := c.Cmd.Run(GIT, "log", branch, "--oneline", "--no-merges")
+	if err != nil {
+		return "", err
+	}
+	return commits, nil
+}
+
+func (c Commands) GetBranches() ([]string, error) {
+	// Fetch latest changes from remote
+	_, _ = c.Cmd.Run(GIT, "fetch", "origin")
+
+	output, err := c.Cmd.Run(GIT, "branch", "-r", "--format=%(refname:short)")
+	if err != nil {
+		return nil, err
+	}
+
+	var branches []string
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.Contains(line, "HEAD") {
+			// Remove origin/ prefix
+			if strings.HasPrefix(line, "origin/") {
+				line = strings.TrimPrefix(line, "origin/")
+			}
+			branches = append(branches, line)
+		}
+	}
+	return branches, nil
+}
+
+func (c Commands) GetCommitsBetweenBranches(targetBranch, currentBranch string) (string, error) {
+	// Fetch latest changes from remote
+	_, _ = c.Cmd.Run(GIT, "fetch", "origin")
+
+	commits, err := c.Cmd.Run(GIT, "log", fmt.Sprintf("origin/%s..%s", targetBranch, currentBranch), "--oneline", "--no-merges")
 	if err != nil {
 		return "", err
 	}

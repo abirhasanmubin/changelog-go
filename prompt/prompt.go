@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/abirhasanmubin/changelog-go/changelog"
+	"github.com/abirhasanmubin/changelog-go/command"
 	"github.com/abirhasanmubin/changelog-go/input"
 )
 
@@ -26,6 +27,8 @@ func Generate() {
 	promptChecklist(&entry, prompter)
 
 	fmt.Printf("\n\033[33m\033[1m⏳ Collecting git commit information...\033[0m\n")
+	targetBranch := promptTargetBranch(prompter)
+	entry.PopulateCommitHistory(targetBranch)
 
 	// Use current working directory for file generation
 	cwd, err := os.Getwd()
@@ -88,4 +91,21 @@ func promptChecklist(entry *changelog.Entry, prompter input.Prompter) {
 	entry.Checklist.Documentation, _ = prompter.TakeBooleanTypeInput("I have added necessary documentation (if appropriate)", false)
 	entry.Checklist.EngineerReachout, _ = prompter.TakeBooleanTypeInput("I have proactively reached out to an engineer to review this PR", false)
 	entry.Checklist.ReadmeUpdated, _ = prompter.TakeBooleanTypeInput("I have updated the README file (if appropriate)", false)
+}
+
+func promptTargetBranch(prompter input.Prompter) string {
+	cmd := command.Commands{Cmd: command.CommandRunner{}}
+	branches, err := cmd.GetBranches()
+	if err != nil || len(branches) == 0 {
+		fmt.Printf("\033[31m⚠ Could not fetch branches, skipping target branch selection\033[0m\n")
+		return ""
+	}
+
+	targetBranch, err := prompter.TakeSingleSelectInput("Select target source branch", branches)
+	if err != nil {
+		fmt.Printf("\033[31m⚠ Error selecting target branch: %v\033[0m\n", err)
+		return ""
+	}
+
+	return targetBranch
 }
