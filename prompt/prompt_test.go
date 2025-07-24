@@ -48,6 +48,13 @@ func (m *MockPrompterWithSequentialBooleans) TakeMultiSelectInput(question strin
 	return result, nil
 }
 
+func (m *MockPrompterWithSequentialBooleans) TakeSingleSelectInput(question string, options []string) (string, error) {
+	if len(options) > 0 {
+		return options[0], nil
+	}
+	return "default", nil
+}
+
 func NewMockPrompter() *MockPrompter {
 	return &MockPrompter{
 		responses: make(map[string]interface{}),
@@ -116,6 +123,20 @@ func (m *MockPrompter) TakeMultiSelectInput(question string, options []string) (
 		result[option] = ""
 	}
 	return result, nil
+}
+
+func (m *MockPrompter) TakeSingleSelectInput(question string, options []string) (string, error) {
+	m.callCount["TakeSingleSelectInput"]++
+	if resp, ok := m.responses["TakeSingleSelectInput"]; ok {
+		if err, isErr := resp.(error); isErr {
+			return "", err
+		}
+		return resp.(string), nil
+	}
+	if len(options) > 0 {
+		return options[0], nil
+	}
+	return "default", nil
 }
 
 func TestPromptChangeTypes(t *testing.T) {

@@ -82,6 +82,7 @@ type Prompter interface {
 	TakeMultiInstructionInput(question string) ([]string, error)
 	TakeBooleanTypeInput(question string, defaultValue bool) (bool, error)
 	TakeMultiSelectInput(question string, options []string) (map[string]string, error)
+	TakeSingleSelectInput(question string, options []string) (string, error)
 }
 
 type Handler struct {
@@ -241,4 +242,37 @@ func (h Handler) TakeMultiSelectInput(question string, options []string) (map[st
 	}
 
 	return result, nil
+}
+
+func (h Handler) TakeSingleSelectInput(question string, options []string) (string, error) {
+	if h.testMode {
+		// Fallback to old behavior for testing
+		for {
+			fmt.Printf("%s:\n", question)
+			for i, option := range options {
+				fmt.Printf("%d. %s\n", i+1, option)
+			}
+			fmt.Print("Select option (number): ")
+
+			input, err := h.reader.ReadLine()
+			if err != nil {
+				return "", err
+			}
+
+			var idx int
+			if _, err := fmt.Sscanf(strings.TrimSpace(input), "%d", &idx); err != nil {
+				fmt.Println("Please enter a valid number.")
+				continue
+			}
+
+			if idx >= 1 && idx <= len(options) {
+				return options[idx-1], nil
+			}
+
+			fmt.Println("Please select a valid option.")
+		}
+	}
+
+	singleSelect := ui.NewSingleSelect(options)
+	return singleSelect.Run(question)
 }
