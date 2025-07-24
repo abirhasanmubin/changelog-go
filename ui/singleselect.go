@@ -2,19 +2,19 @@ package ui
 
 import (
 	"fmt"
-	"os"
 )
 
 type SingleSelect struct {
+	BaseSelector
 	options []string
-	cursor  int
 }
 
 func NewSingleSelect(options []string) *SingleSelect {
-	return &SingleSelect{
+	ss := &SingleSelect{
 		options: options,
-		cursor:  0,
 	}
+	ss.cursor = 0
+	return ss
 }
 
 func (ss *SingleSelect) Run(question string) (string, error) {
@@ -30,67 +30,37 @@ func (ss *SingleSelect) Run(question string) (string, error) {
 
 	// Initial render
 	for i, option := range ss.options {
-		cursor := " "
-		color := ColorReset
-		if i == ss.cursor {
-			cursor = ColorCyan + ">" + ColorReset
-			color = ColorBold
-		}
-		fmt.Printf("%s %s%s%s\n", cursor, color, option, ColorReset)
+		ss.renderSimpleOption(i, option)
 	}
 
 	for {
-		var b [3]byte
-		n, _ := os.Stdin.Read(b[:])
+		b, n := ss.readKey()
 
 		if n == 1 {
 			switch b[0] {
-			case 13, 10: // Enter
-				fmt.Println() // Add newline after selection
+			case KeyEnter, 10: // Enter or newline
+				fmt.Println()
 				return ss.options[ss.cursor], nil
-			case 3: // Ctrl+C
+			case KeyCtrlC:
 				return "", fmt.Errorf("cancelled")
-			case 106: // 'j' key (down)
-				if ss.cursor < len(ss.options)-1 {
-					ss.cursor++
-					ss.render()
-				}
-			case 107: // 'k' key (up)
-				if ss.cursor > 0 {
-					ss.cursor--
+			default:
+				if ss.handleNavigation(b[0], len(ss.options)-1) {
 					ss.render()
 				}
 			}
 		} else if n == 3 && b[0] == 27 && b[1] == 91 {
-			switch b[2] {
-			case 65: // Up arrow
-				if ss.cursor > 0 {
-					ss.cursor--
-					ss.render()
-				}
-			case 66: // Down arrow
-				if ss.cursor < len(ss.options)-1 {
-					ss.cursor++
-					ss.render()
-				}
+			if ss.handleArrowKeys(b[2], len(ss.options)-1) {
+				ss.render()
 			}
 		}
 	}
 }
 
 func (ss *SingleSelect) render() {
-	// Move cursor up to overwrite previous output
-	fmt.Printf("\033[%dA", len(ss.options)+2)
-	fmt.Print("\033[J") // Clear from cursor to end of screen
+	ss.clearScreen(len(ss.options) + 2)
 	fmt.Printf("%sUse j/k or ↑/↓ to navigate, ENTER to confirm%s\n\n", ColorDim, ColorReset)
 
 	for i, option := range ss.options {
-		cursor := " "
-		color := ColorReset
-		if i == ss.cursor {
-			cursor = ColorCyan + ">" + ColorReset
-			color = ColorBold
-		}
-		fmt.Printf("%s %s%s%s\n", cursor, color, option, ColorReset)
+		ss.renderSimpleOption(i, option)
 	}
 }

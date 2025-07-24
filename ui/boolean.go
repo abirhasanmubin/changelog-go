@@ -47,15 +47,15 @@ func (bs *BooleanSelect) Run() (bool, error) {
 
 		if n == 1 {
 			switch b[0] {
-			case 13, 10: // Enter
-				fmt.Printf("\n") // Single newline after selection
+			case KeyEnter, 10: // Enter or newline
+				fmt.Printf("\n")
 				return bs.cursor == 0, nil
-			case 3: // Ctrl+C
+			case KeyCtrlC:
 				return false, fmt.Errorf("cancelled")
-			case 104: // 'h' key (left)
+			case KeyH: // 'h' key (left)
 				bs.cursor = 0
 				bs.render()
-			case 108: // 'l' key (right)
+			case KeyL: // 'l' key (right)
 				bs.cursor = 1
 				bs.render()
 			}

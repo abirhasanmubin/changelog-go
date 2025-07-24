@@ -74,8 +74,7 @@ func (CommandRunner) Run(ct CommandType, args ...string) (string, error) {
 }
 
 type CommandLists interface {
-	GetGitUsername() (string, error)
-	GetOSUserName() (string, error)
+	GetUsername() (string, error)
 	GetCurrentBranch() (string, error)
 	GetCommitHttpUrlPrefixFromRemoteUrl() (string, error)
 	GetBranches() ([]string, error)
@@ -154,21 +153,7 @@ func (c Commands) GetCommitHttpUrlPrefixFromRemoteUrl() (string, error) {
 	return "", NoCommitHttpUrlPrefixError
 }
 
-func (c Commands) GetCommitsOfCurrentBranch() (string, error) {
-	// Fetch latest changes from remote
-	_, _ = c.Cmd.Run(GIT, "fetch", "origin")
 
-	branch, err := c.GetCurrentBranch()
-	if err != nil {
-		return "", err
-	}
-
-	commits, err := c.Cmd.Run(GIT, "log", branch, "--oneline", "--no-merges")
-	if err != nil {
-		return "", err
-	}
-	return commits, nil
-}
 
 func (c Commands) GetBranches() ([]string, error) {
 	// Fetch latest changes from remote

@@ -35,12 +35,16 @@ func (sr StdinReader) ReadMultiInstruction(delimiter string) ([]string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	var lines []string
 
-	fmt.Printf("\033[2m(Enter %q on a new line to finish input)\033[0m\n", delimiter)
+	fmt.Printf("\033[2m(Enter %q on a new line or Ctrl+D to finish input)\033[0m\n", delimiter)
 
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			return nil, TakingInputError
+			// Handle EOF (Ctrl+D)
+			if len(line) > 0 {
+				lines = append(lines, strings.TrimRight(line, "\n\r"))
+			}
+			break
 		}
 
 		line = strings.TrimRight(line, "\n\r")
@@ -57,12 +61,16 @@ func (sr StdinReader) ReadMultiLine(delimiter string) (string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	var lines []string
 
-	fmt.Printf("\033[2m(Enter %q on a new line to finish input)\033[0m\n", delimiter)
+	fmt.Printf("\033[2m(Enter %q on a new line or Ctrl+D to finish input)\033[0m\n", delimiter)
 
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			return "", TakingInputError
+			// Handle EOF (Ctrl+D)
+			if len(line) > 0 {
+				lines = append(lines, strings.TrimRight(line, "\n\r"))
+			}
+			break
 		}
 
 		line = strings.TrimRight(line, "\n\r")
@@ -72,7 +80,7 @@ func (sr StdinReader) ReadMultiLine(delimiter string) (string, error) {
 		lines = append(lines, line)
 	}
 
-	fmt.Println() // Add newline after multi-line input
+	fmt.Println()
 	return strings.Join(lines, "\n"), nil
 }
 
@@ -128,39 +136,39 @@ func (h Handler) TakeMultiInstructionInput(question string) ([]string, error) {
 
 func (h Handler) TakeBooleanTypeInput(question string, defaultValue bool) (bool, error) {
 	if h.testMode {
-		// Fallback to old behavior for testing
-		prompt := "(yes/no)"
-		if defaultValue {
-			prompt = "(Yes/no)"
-		} else {
-			prompt = "(yes/No)"
-		}
-
-		for {
-			fmt.Printf("%s %s: ", question, prompt)
-			input, err := h.reader.ReadLine()
-			if err != nil {
-				return false, err
-			}
-
-			input = strings.ToLower(strings.TrimSpace(input))
-			if input == "" {
-				return defaultValue, nil
-			}
-
-			switch input {
-			case "y", "yes", "true", "1":
-				return true, nil
-			case "n", "no", "false", "0":
-				return false, nil
-			default:
-				fmt.Println("Please enter y/yes/true/1 or n/no/false/0")
-			}
-		}
+		return h.takeBooleanInputFallback(question, defaultValue)
 	}
-
 	boolSelect := ui.NewBooleanSelect(question, defaultValue)
 	return boolSelect.Run()
+}
+
+func (h Handler) takeBooleanInputFallback(question string, defaultValue bool) (bool, error) {
+	prompt := "(yes/No)"
+	if defaultValue {
+		prompt = "(Yes/no)"
+	}
+
+	for {
+		fmt.Printf("%s %s: ", question, prompt)
+		input, err := h.reader.ReadLine()
+		if err != nil {
+			return false, err
+		}
+
+		input = strings.ToLower(strings.TrimSpace(input))
+		if input == "" {
+			return defaultValue, nil
+		}
+
+		switch input {
+		case "y", "yes", "true", "1":
+			return true, nil
+		case "n", "no", "false", "0":
+			return false, nil
+		default:
+			fmt.Println("Please enter y/yes/true/1 or n/no/false/0")
+		}
+	}
 }
 
 func (h Handler) TakeMultiSelectInput(question string, options []string) (map[string]string, error) {

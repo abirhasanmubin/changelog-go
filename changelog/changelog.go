@@ -9,33 +9,6 @@ import (
 	"github.com/abirhasanmubin/changelog-go/command"
 )
 
-type EntryType int
-
-const (
-	FEATURE EntryType = iota
-	BUGFIX
-	REFACTOR
-	DOCUMENTATION
-	OTHER
-)
-
-func (et EntryType) String() string {
-	switch et {
-	case FEATURE:
-		return "FEATURE"
-	case BUGFIX:
-		return "BUGFIX"
-	case REFACTOR:
-		return "REFACTOR"
-	case DOCUMENTATION:
-		return "DOCUMENTATION"
-	case OTHER:
-		return "OTHER"
-	default:
-		return "UNKOWN"
-	}
-}
-
 type GitCommit struct {
 	Hash      string
 	Message   string
@@ -67,7 +40,6 @@ type Checklist struct {
 }
 
 type Entry struct {
-	Type         EntryType
 	Title        string
 	Motivation   string
 	Description  string
@@ -128,37 +100,43 @@ func NewEntry() Entry {
 	return entry
 }
 
+var changeTypes = []string{"Bug fix", "New feature", "Code refactor", "Breaking change", "Documentation update", "Other"}
+
 func (e *Entry) GenerateMarkdown(selectedTypes map[string]string) string {
 	var md strings.Builder
 
-	// Title
+	e.writeTitle(&md)
+	e.writeOptionalSection(&md, "Motivation", e.Motivation)
+	e.writeOptionalSection(&md, "Description", e.Description)
+	e.writeChangeTypes(&md, selectedTypes)
+	e.writeOptionalList(&md, "To-do before merge", e.Todos, "- [ ] %s\n")
+	e.writeOptionalList(&md, "Changes to existing models:", e.ModelChanges, "- %s\n")
+	e.writeTestingInstructions(&md)
+	e.writeChecklist(&md)
+	e.writeCommitList(&md)
+
+	return md.String()
+}
+
+func (e *Entry) writeTitle(md *strings.Builder) {
 	md.WriteString("## Title\n\n")
 	md.WriteString(e.Title + "\n\n")
+}
 
-	// Motivation
-	if e.Motivation != "" {
-		md.WriteString("## Motivation\n\n")
-		lines := strings.Split(e.Motivation, "\n")
-		for _, line := range lines {
-			md.WriteString(line + "  \n")
-		}
-		md.WriteString("\n")
+func (e *Entry) writeOptionalSection(md *strings.Builder, title, content string) {
+	if strings.TrimSpace(content) == "" {
+		return
 	}
-
-	// Description
-	if e.Description != "" {
-		md.WriteString("## Description\n\n")
-		lines := strings.Split(e.Description, "\n")
-		for _, line := range lines {
-			md.WriteString(line + "  \n")
-		}
-		md.WriteString("\n")
+	md.WriteString(fmt.Sprintf("## %s\n\n", title))
+	for _, line := range strings.Split(content, "\n") {
+		md.WriteString(line + "  \n")
 	}
+	md.WriteString("\n")
+}
 
-	// Type of change
+func (e *Entry) writeChangeTypes(md *strings.Builder, selectedTypes map[string]string) {
 	md.WriteString("## Type of change\n\n")
-	allTypes := []string{"Bug fix", "New feature", "Code refactor", "Breaking change", "Documentation update", "Other"}
-	for _, changeType := range allTypes {
+	for _, changeType := range changeTypes {
 		if val, exists := selectedTypes[changeType]; exists && val != "" {
 			if changeType == "Other" && val != changeType {
 				md.WriteString(fmt.Sprintf("- [x] %s: %s\n", changeType, val))
@@ -170,58 +148,62 @@ func (e *Entry) GenerateMarkdown(selectedTypes map[string]string) string {
 		}
 	}
 	md.WriteString("\n")
+}
 
-	// To-do before merge
-	if len(e.Todos) > 0 {
-		md.WriteString("## To-do before merge\n\n")
-		for _, todo := range e.Todos {
-			md.WriteString(fmt.Sprintf("- [ ] %s\n", todo))
-		}
-		md.WriteString("\n")
+func (e *Entry) writeOptionalList(md *strings.Builder, title string, items []string, format string) {
+	if len(items) == 0 {
+		return
 	}
-
-	// Changes to existing models
-	if len(e.ModelChanges) > 0 {
-		md.WriteString("## Changes to existing models:\n\n")
-		for _, change := range e.ModelChanges {
-			md.WriteString(fmt.Sprintf("- %s\n", change))
-		}
-		md.WriteString("\n")
+	md.WriteString(fmt.Sprintf("## %s\n\n", title))
+	for _, item := range items {
+		md.WriteString(fmt.Sprintf(format, item))
 	}
-
-	// Testing Instructions
-	if len(e.Testing) > 0 {
-		md.WriteString("## Testing Instructions\n\n")
-		for i, step := range e.Testing {
-			md.WriteString(fmt.Sprintf("%d. %s\n", i+1, step))
-		}
-		md.WriteString("\n")
-	}
-
-	// Checklist
-	md.WriteString("## Checklist\n\n")
-	md.WriteString(fmt.Sprintf("- [%s] I have performed a self-review of my code\n", checkboxValue(e.Checklist.SelfReview)))
-	md.WriteString(fmt.Sprintf("- [%s] I have added tests that prove my fix is effective or my feature works\n", checkboxValue(e.Checklist.IncludesTesting)))
-	md.WriteString(fmt.Sprintf("- [%s] I have added necessary documentation (if appropriate)\n", checkboxValue(e.Checklist.Documentation)))
-	md.WriteString(fmt.Sprintf("- [%s] I have proactively reached out to an engineer to review this PR\n", checkboxValue(e.Checklist.EngineerReachout)))
-	md.WriteString(fmt.Sprintf("- [%s] I have updated the README file (if appropriate)\n", checkboxValue(e.Checklist.ReadmeUpdated)))
 	md.WriteString("\n")
+}
 
-	// Commit List
-	if len(e.Metadata.Commits) > 0 {
-		md.WriteString("## Commit List\n\n")
-		if e.Metadata.TargetBranch != "" {
-			md.WriteString(fmt.Sprintf("Commits from '%s' to '%s':\n", e.Metadata.TargetBranch, e.Metadata.Branch))
-		} else {
-			md.WriteString(fmt.Sprintf("Commits from branch '%s':\n", e.Metadata.Branch))
-		}
-		for _, commit := range e.Metadata.Commits {
-			md.WriteString(fmt.Sprintf("- [%s](%s) %s\n", commit.Hash[:7], commit.CommitUrl, commit.Message))
-		}
-		md.WriteString("\n")
+func (e *Entry) writeTestingInstructions(md *strings.Builder) {
+	if len(e.Testing) == 0 {
+		return
 	}
+	md.WriteString("## Testing Instructions\n\n")
+	for i, step := range e.Testing {
+		md.WriteString(fmt.Sprintf("%d. %s\n", i+1, step))
+	}
+	md.WriteString("\n")
+}
 
-	return md.String()
+func (e *Entry) writeChecklist(md *strings.Builder) {
+	md.WriteString("## Checklist\n\n")
+	checklist := []struct {
+		text    string
+		checked bool
+	}{
+		{"I have performed a self-review of my code", e.Checklist.SelfReview},
+		{"I have added tests that prove my fix is effective or my feature works", e.Checklist.IncludesTesting},
+		{"I have added necessary documentation (if appropriate)", e.Checklist.Documentation},
+		{"I have proactively reached out to an engineer to review this PR", e.Checklist.EngineerReachout},
+		{"I have updated the README file (if appropriate)", e.Checklist.ReadmeUpdated},
+	}
+	for _, item := range checklist {
+		md.WriteString(fmt.Sprintf("- [%s] %s\n", checkboxValue(item.checked), item.text))
+	}
+	md.WriteString("\n")
+}
+
+func (e *Entry) writeCommitList(md *strings.Builder) {
+	if len(e.Metadata.Commits) == 0 {
+		return
+	}
+	md.WriteString("## Commit List\n\n")
+	if e.Metadata.TargetBranch != "" {
+		md.WriteString(fmt.Sprintf("Commits from '%s' to '%s':\n", e.Metadata.TargetBranch, e.Metadata.Branch))
+	} else {
+		md.WriteString(fmt.Sprintf("Commits from branch '%s':\n", e.Metadata.Branch))
+	}
+	for _, commit := range e.Metadata.Commits {
+		md.WriteString(fmt.Sprintf("- [%s](%s) %s\n", commit.Hash[:7], commit.CommitUrl, commit.Message))
+	}
+	md.WriteString("\n")
 }
 
 func checkboxValue(checked bool) string {
@@ -229,6 +211,98 @@ func checkboxValue(checked bool) string {
 		return "x"
 	}
 	return " "
+}
+
+func (e *Entry) GenerateBitbucketPR(selectedTypes map[string]string) string {
+	var content strings.Builder
+
+	content.WriteString("### " + e.Title + "\n\n")
+
+	if strings.TrimSpace(e.Motivation) != "" {
+		content.WriteString("**Motivation:**\n" + e.Motivation + "\n\n")
+	}
+
+	if strings.TrimSpace(e.Description) != "" {
+		content.WriteString(e.Description + "\n\n")
+	}
+
+	e.writePRChangeTypes(&content, selectedTypes)
+	e.writePROptionalList(&content, "To-do before merge:", e.Todos, "- [ ] %s\n")
+	e.writePROptionalList(&content, "Changes to existing models:", e.ModelChanges, "- %s\n")
+	e.writePRTestingInstructions(&content)
+	e.writePRChecklist(&content)
+	e.writePRCommitList(&content)
+
+	return content.String()
+}
+
+func (e *Entry) writePRChangeTypes(content *strings.Builder, selectedTypes map[string]string) {
+	content.WriteString("**Type of change:**\n")
+	for _, changeType := range changeTypes {
+		if val, exists := selectedTypes[changeType]; exists && val != "" {
+			if changeType == "Other" && val != changeType {
+				content.WriteString(fmt.Sprintf("- ✅ %s: %s\n", changeType, val))
+			} else {
+				content.WriteString(fmt.Sprintf("- ✅ %s\n", changeType))
+			}
+		}
+	}
+	content.WriteString("\n")
+}
+
+func (e *Entry) writePROptionalList(content *strings.Builder, title string, items []string, format string) {
+	if len(items) == 0 {
+		return
+	}
+	content.WriteString(fmt.Sprintf("**%s**\n", title))
+	for _, item := range items {
+		content.WriteString(fmt.Sprintf(format, item))
+	}
+	content.WriteString("\n")
+}
+
+func (e *Entry) writePRTestingInstructions(content *strings.Builder) {
+	if len(e.Testing) == 0 {
+		return
+	}
+	content.WriteString("**Testing Instructions:**\n")
+	for i, step := range e.Testing {
+		content.WriteString(fmt.Sprintf("%d. %s\n", i+1, step))
+	}
+	content.WriteString("\n")
+}
+
+func (e *Entry) writePRCommitList(content *strings.Builder) {
+	if len(e.Metadata.Commits) == 0 {
+		return
+	}
+	content.WriteString("**Commits:**\n")
+	for _, commit := range e.Metadata.Commits {
+		content.WriteString(fmt.Sprintf("- [%s](%s) %s\n", commit.Hash[:7], commit.CommitUrl, commit.Message))
+	}
+	content.WriteString("\n")
+}
+
+func (e *Entry) writePRChecklist(content *strings.Builder) {
+	content.WriteString("**Checklist:**\n")
+	checklist := []struct {
+		text    string
+		checked bool
+	}{
+		{"I have performed a self-review of my code", e.Checklist.SelfReview},
+		{"I have added tests that prove my fix is effective or my feature works", e.Checklist.IncludesTesting},
+		{"I have added necessary documentation (if appropriate)", e.Checklist.Documentation},
+		{"I have proactively reached out to an engineer to review this PR", e.Checklist.EngineerReachout},
+		{"I have updated the README file (if appropriate)", e.Checklist.ReadmeUpdated},
+	}
+	for _, item := range checklist {
+		icon := "❌"
+		if item.checked {
+			icon = "✅"
+		}
+		content.WriteString(fmt.Sprintf("- %s %s\n", icon, item.text))
+	}
+	content.WriteString("\n")
 }
 
 func (e *Entry) SaveToFile(selectedTypes map[string]string, filePath string) error {
