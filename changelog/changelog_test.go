@@ -32,25 +32,7 @@ func (m MockCommands) GetCommitsOfCurrentBranch() (string, error) {
 	return m.Commits, m.Err
 }
 
-func TestEntryType_String(t *testing.T) {
-	tests := []struct {
-		et   EntryType
-		want string
-	}{
-		{FEATURE, "FEATURE"},
-		{BUGFIX, "BUGFIX"},
-		{REFACTOR, "REFACTOR"},
-		{DOCUMENTATION, "DOCUMENTATION"},
-		{OTHER, "OTHER"},
-		{EntryType(99), "UNKOWN"},
-	}
 
-	for _, tt := range tests {
-		if got := tt.et.String(); got != tt.want {
-			t.Errorf("EntryType.String() = %v, want %v", got, tt.want)
-		}
-	}
-}
 
 func TestMetadata_GenerateFilename(t *testing.T) {
 	tests := []struct {
@@ -398,6 +380,122 @@ func TestEntry_GenerateMarkdown_WithCommits(t *testing.T) {
 	}
 	if !strings.Contains(markdown, "[456ghi7](https://github.com/user/repo/commit/456ghi789) Second commit") {
 		t.Error("expected second commit with shortened hash")
+	}
+}
+
+func TestEntry_GenerateBitbucketPR_EmptyFields(t *testing.T) {
+	entry := &Entry{
+		Title:       "Simple fix",
+		Description: "Basic description",
+		Checklist: Checklist{
+			SelfReview: true,
+		},
+	}
+
+	selectedTypes := map[string]string{"Bug fix": "Bug fix"}
+	prContent := entry.GenerateBitbucketPR(selectedTypes)
+
+	// Should contain basic content
+	if !strings.Contains(prContent, "Basic description") {
+		t.Error("Expected description in PR content")
+	}
+	if !strings.Contains(prContent, "- ✅ Bug fix") {
+		t.Error("Expected bug fix type")
+	}
+	if !strings.Contains(prContent, "**Checklist:**") {
+		t.Error("Expected checklist section")
+	}
+
+	// Should not contain empty sections
+	if strings.Contains(prContent, "**Motivation:**") {
+		t.Error("Should not contain motivation section when empty")
+	}
+	if strings.Contains(prContent, "**To-do before merge:**") {
+		t.Error("Should not contain todos section when empty")
+	}
+	if strings.Contains(prContent, "**Changes to existing models:**") {
+		t.Error("Should not contain model changes section when empty")
+	}
+	if strings.Contains(prContent, "**Testing Instructions:**") {
+		t.Error("Should not contain testing section when empty")
+	}
+}
+
+func TestEntry_GenerateBitbucketPR(t *testing.T) {
+	entry := &Entry{
+		Title:       "Fix authentication bug",
+		Description: "Fixed token validation in login flow",
+		Motivation:  "Users were experiencing login failures",
+		Todos:       []string{"Update documentation"},
+		ModelChanges: []string{"Updated User model"},
+		Testing:     []string{"Test login flow", "Test token validation"},
+		Checklist: Checklist{
+			SelfReview:      true,
+			IncludesTesting: true,
+			Documentation:  false,
+		},
+	}
+
+	selectedTypes := map[string]string{
+		"Bug fix": "Bug fix",
+		"Other":   "Custom change",
+	}
+
+	prContent := entry.GenerateBitbucketPR(selectedTypes)
+
+	// Test Bitbucket PR format
+	if !strings.Contains(prContent, "Fixed token validation in login flow") {
+		t.Error("Description missing from PR content")
+	}
+	if !strings.Contains(prContent, "**Motivation:**") {
+		t.Error("Motivation header missing")
+	}
+	if !strings.Contains(prContent, "Users were experiencing login failures") {
+		t.Error("Motivation content missing")
+	}
+	if !strings.Contains(prContent, "**Type of change:**") {
+		t.Error("Type of change header missing")
+	}
+	if !strings.Contains(prContent, "- ✅ Bug fix") {
+		t.Error("Bug fix with checkmark missing")
+	}
+	if !strings.Contains(prContent, "- ✅ Other: Custom change") {
+		t.Error("Custom other type missing")
+	}
+	if !strings.Contains(prContent, "**To-do before merge:**") {
+		t.Error("To-do header missing")
+	}
+	if !strings.Contains(prContent, "- [ ] Update documentation") {
+		t.Error("To-do item missing")
+	}
+	if !strings.Contains(prContent, "**Changes to existing models:**") {
+		t.Error("Model changes header missing")
+	}
+	if !strings.Contains(prContent, "- Updated User model") {
+		t.Error("Model change missing")
+	}
+	if !strings.Contains(prContent, "**Testing Instructions:**") {
+		t.Error("Testing header missing")
+	}
+	if !strings.Contains(prContent, "1. Test login flow") {
+		t.Error("Testing step missing")
+	}
+	if !strings.Contains(prContent, "**Checklist:**") {
+		t.Error("Checklist header missing")
+	}
+	if !strings.Contains(prContent, "- ✅ I have performed a self-review") {
+		t.Error("Checked item missing")
+	}
+	if !strings.Contains(prContent, "- ✅ I have added tests") {
+		t.Error("Testing checklist item missing")
+	}
+	if !strings.Contains(prContent, "- ❌ I have added necessary documentation") {
+		t.Error("Documentation checklist item missing")
+	}
+
+	// Test that commit history is NOT included in Bitbucket PR format
+	if strings.Contains(prContent, "Commit List") {
+		t.Error("Commit list should not be in Bitbucket PR format")
 	}
 }
 

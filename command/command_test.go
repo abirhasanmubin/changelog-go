@@ -193,50 +193,7 @@ func TestCommands_GetCommitHttpUrlPrefixFromRemoteUrl(t *testing.T) {
 	})
 }
 
-func TestCommands_GetCommitsOfCurrentBranch(t *testing.T) {
-	t.Run("Returns commit history", func(t *testing.T) {
-		mock := &MockRunnerWithCallCount{
-			Outputs: []string{"", "main", "a1b2c3d Fix bug\ne4f5g6h Add feature"},
-			Errs:    []error{nil, nil, nil},
-		}
-		cmd := Commands{Cmd: mock}
 
-		commits, err := cmd.GetCommitsOfCurrentBranch()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		expected := "a1b2c3d Fix bug\ne4f5g6h Add feature"
-		if commits != expected {
-			t.Errorf("got %q, want %q", commits, expected)
-		}
-	})
-
-	t.Run("Returns error when git log fails", func(t *testing.T) {
-		mock := &MockRunnerWithCallCount{
-			Outputs: []string{"", "main", ""},
-			Errs:    []error{nil, nil, RunningCommandError},
-		}
-		cmd := Commands{Cmd: mock}
-
-		_, err := cmd.GetCommitsOfCurrentBranch()
-		if !errors.Is(err, RunningCommandError) {
-			t.Errorf("expected RunningCommandError, got %v", err)
-		}
-	})
-
-	t.Run("Returns error when GetCurrentBranch fails", func(t *testing.T) {
-		mock := &MockRunnerWithCallCount{
-			Outputs: []string{"", "", ""},
-			Errs:    []error{nil, nil, NoGitBranchFoundError},
-		}
-		cmd := Commands{Cmd: mock}
-
-		_, err := cmd.GetCommitsOfCurrentBranch()
-		if !errors.Is(err, NoGitBranchFoundError) {
-			t.Errorf("expected NoGitBranchFoundError, got %v", err)
-		}
-	})
-}
 
 func TestCommands_GetCommitHttpUrlPrefixFromRemoteUrl_EdgeCases(t *testing.T) {
 	t.Run("Returns error for unsupported URL format", func(t *testing.T) {

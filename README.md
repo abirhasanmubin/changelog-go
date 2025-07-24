@@ -7,7 +7,10 @@ An interactive command-line tool for generating structured changelog entries in 
 - Interactive prompts with colorful UI
 - Intuitive navigation (arrow keys, vim-style keys)
 - Git integration (branch, commits, user info)
-- Markdown output with structured sections
+- Multiple output formats:
+  - Generate markdown file
+  - Copy Bitbucket PR text to clipboard
+  - Display Bitbucket PR text
 - Customizable change types with validation
 - Inline yes/no selection
 - Checklist for PR readiness
@@ -43,6 +46,10 @@ changelog-go
 - a: Toggle all options
 - ENTER: Confirm selection
 
+**Single-select options:**
+- ↑/↓ or j/k: Navigate up/down
+- ENTER: Confirm selection
+
 **Yes/No questions:**
 - ←/→ or h/l: Navigate left/right
 - ENTER: Confirm selection
@@ -61,10 +68,10 @@ func main() {
 }
 ```
 
-## Generated Output
+## Output Formats
 
-The tool creates a structured changelog in `.logs/.changelog/` with sections for:
-
+### 1. Generate File
+Creates a structured changelog in `.logs/.changelog/` with sections for:
 - Title and description
 - Type of changes (bug fix, feature, etc.)
 - Motivation and implementation details
@@ -73,6 +80,14 @@ The tool creates a structured changelog in `.logs/.changelog/` with sections for
 - Testing instructions
 - PR checklist
 - Git commit history
+
+### 2. Bitbucket PR Format
+Generates optimized content for Bitbucket pull requests:
+- **Copy to clipboard**: Automatically copies PR description to system clipboard
+- **Display text**: Shows formatted PR content for manual copying
+- Compact format with checkmarks (✅) for selected change types
+- Bold section headers for better readability
+- Excludes commit history (handled by Bitbucket)
 
 ## UI Features
 
@@ -85,6 +100,7 @@ The tool creates a structured changelog in `.logs/.changelog/` with sections for
 
 ## Example Output
 
+### File Format
 ```markdown
 ## Title
 
@@ -98,6 +114,21 @@ Fix user authentication bug
 
 ## Checklist
 
+- [x] I have performed a self-review of my code
+- [x] I have added tests that prove my fix is effective
+```
+
+### Bitbucket PR Format
+```markdown
+Fix user authentication bug in login flow
+
+**Motivation:**
+Users were experiencing login failures due to token validation issues
+
+**Type of change:**
+- ✅ Bug fix
+
+**Checklist:**
 - [x] I have performed a self-review of my code
 - [x] I have added tests that prove my fix is effective
 ```
@@ -126,13 +157,26 @@ go test ./... -cover
 ├── input/         # User input handling with validation
 ├── prompt/        # Interactive prompts with colors
 ├── ui/            # User interface components
+│   ├── base.go        # Shared UI functionality
 │   ├── colors.go      # Color constants
 │   ├── boolean.go     # Inline yes/no selection
 │   ├── multiselect.go # Multi-option selection with validation
+│   ├── singleselect.go # Single option selection
 │   └── terminal.go    # Terminal control
+├── utils/         # Utility functions
+│   └── clipboard.go   # Clipboard operations
 ├── main.go        # CLI entry point
+├── go.mod         # Go module definition
 └── *_test.go      # Test files
 ```
+
+### Recent Optimizations
+
+- **Modular Architecture**: Extracted common UI functionality into base components
+- **Reduced Code Duplication**: Consolidated similar functions across packages
+- **Improved Error Handling**: Consistent error messages with color coding
+- **Streamlined Dependencies**: Updated go.mod with proper versioning
+- **Enhanced Maintainability**: Separated concerns and improved code organization
 
 ## License
 

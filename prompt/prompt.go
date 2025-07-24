@@ -8,42 +8,91 @@ import (
 	"github.com/abirhasanmubin/changelog-go/changelog"
 	"github.com/abirhasanmubin/changelog-go/command"
 	"github.com/abirhasanmubin/changelog-go/input"
+	"github.com/abirhasanmubin/changelog-go/utils"
+)
+
+const (
+	colorHeader  = "\033[36m\033[1m"
+	colorInfo    = "\033[2m"
+	colorWarn    = "\033[33m\033[1m"
+	colorSuccess = "\033[32m\033[1m"
+	colorError   = "\033[31m"
+	colorReset   = "\033[0m"
 )
 
 func Generate() {
 	entry := changelog.NewEntry()
 	prompter := input.NewHandler()
 
-	fmt.Printf("\033[36m\033[1m--- Interactive Changelog Generator ---\033[0m\n")
-	fmt.Printf("\033[2mPlease answer the following questions to generate the changelog.\033[0m\n\n")
+	printHeader()
 
+	// Collect all information
 	selectedTypes := promptChangeTypes(prompter)
 	promptBasicInfo(&entry, prompter)
-	promptMotivation(&entry, prompter)
-	promptDescription(&entry, prompter)
-	promptInstructions(&entry, prompter)
-	promptModelChanges(&entry, prompter)
-	promptTesting(&entry, prompter)
+	promptOptionalSections(&entry, prompter)
 	promptChecklist(&entry, prompter)
 
-	fmt.Printf("\n\033[33m\033[1m⏳ Collecting git commit information...\033[0m\n")
+	// Git operations
+	fmt.Printf("\n%s⏳ Collecting git commit information...%s\n", colorWarn, colorReset)
 	targetBranch := promptTargetBranch(prompter)
 	entry.PopulateCommitHistory(targetBranch)
 
-	// Use current working directory for file generation
+	// Generate output
+	outputFormat := promptOutputFormat(prompter)
+	handleOutput(&entry, selectedTypes, outputFormat)
+}
+
+func printHeader() {
+	fmt.Printf("%s--- Interactive Changelog Generator ---%s\n", colorHeader, colorReset)
+	fmt.Printf("%sPlease answer the following questions to generate the changelog.%s\n\n", colorInfo, colorReset)
+}
+
+func promptOptionalSections(entry *changelog.Entry, prompter input.Prompter) {
+	promptMotivation(entry, prompter)
+	promptDescription(entry, prompter)
+	promptInstructions(entry, prompter)
+	promptModelChanges(entry, prompter)
+	promptTesting(entry, prompter)
+}
+
+func handleOutput(entry *changelog.Entry, selectedTypes map[string]string, outputFormat string) {
+	switch outputFormat {
+	case "Generate file":
+		handleFileOutput(entry, selectedTypes)
+	case "Copy Bitbucket PR text":
+		handleClipboardOutput(entry, selectedTypes)
+	case "Show Bitbucket PR text":
+		handleDisplayOutput(entry, selectedTypes)
+	}
+}
+
+func handleFileOutput(entry *changelog.Entry, selectedTypes map[string]string) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
+		fmt.Printf("%sError getting current directory: %v%s\n", colorError, err, colorReset)
 		return
 	}
 	filePath := filepath.Join(cwd, ".logs", ".changelog")
-	err = entry.SaveToFile(selectedTypes, filePath)
-	if err != nil {
-		fmt.Printf("Error saving changelog: %v\n", err)
+	if err := entry.SaveToFile(selectedTypes, filePath); err != nil {
+		fmt.Printf("%sError saving changelog: %v%s\n", colorError, err, colorReset)
 		return
 	}
+	fmt.Printf("\n%s✅ Success! Changelog generated at: %s/%s%s\n", colorSuccess, filePath, entry.Filename, colorReset)
+}
 
-	fmt.Printf("\n\033[32m\033[1m✅ Success! Changelog generated at: %s/%s\033[0m\n", filePath, entry.Filename)
+func handleClipboardOutput(entry *changelog.Entry, selectedTypes map[string]string) {
+	prContent := entry.GenerateBitbucketPR(selectedTypes)
+	if err := utils.CopyToClipboard(prContent); err != nil {
+		fmt.Printf("%sError copying to clipboard: %v%s\n", colorError, err, colorReset)
+		fmt.Printf("\n%sBitbucket PR content:%s\n\n%s\n", colorWarn, colorReset, prContent)
+	} else {
+		fmt.Printf("\n%s✅ Success! Bitbucket PR content copied to clipboard!%s\n", colorSuccess, colorReset)
+	}
+}
+
+func handleDisplayOutput(entry *changelog.Entry, selectedTypes map[string]string) {
+	prContent := entry.GenerateBitbucketPR(selectedTypes)
+	fmt.Printf("\n%sBitbucket PR Content:%s\n\n%s\n", colorWarn, colorReset, prContent)
 }
 
 func promptChangeTypes(prompter input.Prompter) map[string]string {
@@ -97,15 +146,33 @@ func promptTargetBranch(prompter input.Prompter) string {
 	cmd := command.Commands{Cmd: command.CommandRunner{}}
 	branches, err := cmd.GetBranches()
 	if err != nil || len(branches) == 0 {
-		fmt.Printf("\033[31m⚠ Could not fetch branches, skipping target branch selection\033[0m\n")
+		fmt.Printf("%s⚠ Could not fetch branches, skipping target branch selection%s\n", colorError, colorReset)
 		return ""
 	}
 
-	targetBranch, err := prompter.TakeSingleSelectInput("Select target source branch", branches)
+	// Remove current branch from options
+	currentBranch, _ := cmd.GetCurrentBranch()
+	var filteredBranches []string
+	for _, branch := range branches {
+		if branch != currentBranch {
+			filteredBranches = append(filteredBranches, branch)
+		}
+	}
+
+	targetBranch, err := prompter.TakeSingleSelectInput("Select target source branch", filteredBranches)
 	if err != nil {
-		fmt.Printf("\033[31m⚠ Error selecting target branch: %v\033[0m\n", err)
+		fmt.Printf("%s⚠ Error selecting target branch: %v%s\n", colorError, err, colorReset)
 		return ""
 	}
-
 	return targetBranch
+}
+
+func promptOutputFormat(prompter input.Prompter) string {
+	outputOptions := []string{"Copy Bitbucket PR text", "Show Bitbucket PR text", "Generate file"}
+	selectedFormat, err := prompter.TakeSingleSelectInput("Select output format", outputOptions)
+	if err != nil {
+		fmt.Printf("%s⚠ Error selecting output format: %v%s\n", colorError, err, colorReset)
+		return "Generate file"
+	}
+	return selectedFormat
 }
